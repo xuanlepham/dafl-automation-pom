@@ -1,0 +1,148 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        timeout(time: 25, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '15'))
+    }
+
+    // =========================================================================
+    // 3 CO CHE TRIGGER KICH HOAT TU DONG & DINH KY
+    // =========================================================================
+    triggers {
+        // 1. Tu dong chay ngay khi co code moi push len GitHub (Webhook)
+        githubPush()
+
+        // 2. Tu dong kiem tra Git moi 5 phut (neu chua setup webhook public)
+        pollSCM('H/5 * * * *')
+
+        // 3. Chay dinh ky theo ngay gio co dinh (Nightly Regression vao 02:00 sang tu Thu 2 -> Thu 6)
+        cron('0 2 * * 1-5')
+    }
+
+    parameters {
+        choice(
+            name: 'TEST_SUITE',
+            choices: ['testng-flow.xml', 'testng-negative.xml', 'testng.xml'],
+            description: 'Chon bo test suite: testng-flow.xml (E2E 8 buoc), testng-negative.xml (21 Exception Cases), testng.xml (Full Regression)'
+        )
+        string(
+            name: 'APP_URL',
+            defaultValue: 'http://dafl-frontend:80',
+            description: 'Dia chi Frontend ung dung DAFL trong mang Docker'
+        )
+    }
+
+    environment {
+        REPO_URL        = 'https://github.com/xuanlepham/dafl-automation-pom.git'
+        TARGET_BRANCH   = 'main'
+        DOCKER_NETWORK  = 'dafl_dafl-network'
+    }
+
+    stages {
+        stage('Stage 1: Pull Code & Checkout Test Repository') {
+            steps {
+                echo "=== [Auto Test] Pull ma nguon test POM moi nhat tu GitHub (${TARGET_BRANCH}) ==="
+                git branch: TARGET_BRANCH, url: REPO_URL
+            }
+        }
+
+        stage('Stage 2: Healthcheck SUT Environment') {
+            steps {
+                echo "=== [Auto Test] Kiem tra ket noi den DAFL Frontend & Backend ==="
+                sh """
+                    RETRIES=15
+                    until curl -s -f ${params.APP_URL} > /dev/null || [ \$RETRIES -eq 0 ]; do
+                        echo "Dang cho Frontend san sang... (\$RETRIES lan thu con lai)"
+                        RETRIES=\$((RETRIES - 1))
+                        sleep 3
+                    done
+                    echo "Frontend da san sang tiep nhan kiem thu tu dong!"
+                """
+            }
+        }
+
+        stage('Stage 3: Execute Selenium Continuous Testing') {
+            steps {
+                echo "=== [Auto Test] Thuc thi Selenium Headless trong Docker Runner ==="
+                sh """
+                    rm -rf target/surefire-reports target/allure-results || true
+
+                    SUITE_FILE="${params.TEST_SUITE ?: 'testng-flow.xml'}"
+                    echo "Running Suite: \${SUITE_FILE}"
+
+                    docker run --rm                         --name dafl-selenium-auto-runner                         --network ${DOCKER_NETWORK}                         --volumes-from dafl-jenkins                         -w \$(pwd)                         --memory=1.5g                         --cpus=2.0                         -e APP_URL="${params.APP_URL}"                         markhobson/maven-chrome:jdk-17                         mvn clean test -DsuiteXmlFile=\${SUITE_FILE} -Dheadless=true || true
+                """
+            }
+            post {
+                always {
+                    junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: 'target/surefire-reports/*.xml', allowEmptyArchive: true
+
+                    script {
+                        def allureDir = "target/allure-results"
+                        if (fileExists(allureDir)) {
+                            try {
+                                allure([
+                                    includeProperties: false,
+                                    jdk: '',
+                                    properties: [],
+                                    reportBuildPolicy: 'ALWAYS',
+                                    results: [[path: allureDir]]
+                                ])
+                            } catch (Throwable err) {
+                                echo "Allure Report warning: ${err}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Stage 4: Functional Quality Gate') {
+            steps {
+                echo "=== [Auto Test] Functional Quality Gate - Kiem soat chat luong nghiem ngat ==="
+                script {
+                    def reportDir = "target/surefire-reports"
+                    if (!fileExists(reportDir)) {
+                        error("[Functional Quality Gate FAILED] Khong tim thay thu muc bao cao Surefire!")
+                    }
+
+                    def hasFailures = sh(
+                        script: "grep -rnE 'failures=\"[1-9][0-9]*\"|errors=\"[1-9][0-9]*\"' ${reportDir}/*.xml 2>/dev/null || true",
+                        returnStdout: true
+                    ).trim()
+
+                    if (hasFailures) {
+                        echo "=========================================================="
+                        echo "CHI TIET TEST CASE THAT BAI:"
+                        echo hasFailures
+                        echo "=========================================================="
+                        error("[Functional Quality Gate FAILED] Phat hien Test Case that bai! Chan pipeline ngay lap tuc.")
+                    } else {
+                        echo "=========================================================="
+                        echo "[Functional Quality Gate PASSED] Toan bo test case Selenium deu vuot qua 100%!"
+                        echo "=========================================================="
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "=== Don dep Selenium Runner ==="
+            sh "docker rm -f dafl-selenium-auto-runner 2>/dev/null || true"
+        }
+        success {
+            echo "=========================================================="
+            echo "AUTOMATION TEST PIPELINE: PASSED (100% Tests Thanh Cong)"
+            echo "Xem Allure Report tai menu ben trai cua Jenkins"
+            echo "=========================================================="
+        }
+        failure {
+            echo "AUTOMATION TEST PIPELINE: FAILED (Co Test Case That Bai hoac loi moi truong)"
+        }
+    }
+}

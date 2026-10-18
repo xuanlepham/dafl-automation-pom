@@ -1,93 +1,119 @@
-# DAFL Continuous Testing Automation Framework 🚀
+# DAFL Continuous Testing & Quality Gates Pipeline Framework
 
-Dự án kiểm thử tự động toàn diện (**Continuous Functional, E2E & Negative Scenarios Testing**) cho nền tảng thương mại điện tử **DAFL Store**, phục vụ Đồ án Tốt nghiệp: *Xây dựng và đánh giá quy trình Continuous Testing có Quality Gate tự động*.
-
----
-
-## 🛠️ Công nghệ & Kiến trúc áp dụng
-
-- **Mô hình thiết kế**: Page Object Model (POM) kết hợp Page Factory, Singleton Driver, Factory Pattern.
-- **Ngôn ngữ & Runtime**: Java 17 / Java 21 LTS, Apache Maven 3.9+.
-- **Thư viện lõi**:
-  - **Selenium WebDriver 4.33.0**: Tương thích hoàn toàn Google Chrome v155+, Chromium DevTools Protocol (CDP).
-  - **TestNG 7.11.0**: Quản trị luồng kiểm thử, annotations lifecycle (`@BeforeClass`, `@Test(priority)`), parallel execution.
-  - **Allure TestNG 2.29.1**: Báo cáo trực quan từng Step, Severity, Epic, Feature, Story, Screenshots.
-  - **WebDriverManager 5.9.3**: Tự động tải và đồng bộ driver tương thích với phiên bản trình duyệt.
+Dự án kiểm thử tự động toàn diện (**Automation Functional Testing**) và kiểm thử hiệu năng (**Performance Testing**) tích hợp trực tiếp vào **CI/CD Jenkins Pipeline** với 2 cổng **Quality Gate tự động** cho nền tảng thương mại điện tử **DAFL**.
 
 ---
 
-## 🎯 3 Bộ Kiểm thử (Test Suites)
+## 1. KIẾN TRÚC REPOSITORY & TỔ CHỨC MÃ NGUỒN
 
-| Test Suite File | Tên Suite | Mục tiêu kiểm thử | Số lượng Cases |
-| :--- | :--- | :--- | :---: |
-| `testng-flow.xml` | **E2E Shopping Flow** | Luồng khách hàng mua sắm xuyên suốt từ đăng nhập đến thanh toán PayOS & cập nhật địa chỉ | **8 Steps** (100% Passed) |
-| `testng-negative.xml` | **Negative & Exception Scenarios** | Bộ kiểm thử ngoại lệ, dữ liệu không hợp lệ, biên, bảo mật injection phủ toàn bộ 5 luồng | **21 Cases** (100% Passed) |
-| `testng.xml` | **Full Continuous Regression** | Tổng hợp toàn diện E2E Journey, Negative Cases và các Module Regression | **40+ Cases** (100% Passed) |
+Repository này là trung tâm điều phối toàn bộ hoạt động kiểm thử và CI/CD của hệ sinh thái DAFL:
 
----
-
-## 🛡️ Chi tiết Bộ 21 Kịch bản Ngoại lệ (Negative & Exception Cases)
-
-### Phân hệ 1: Xác thực & Đăng ký (Authentication & Registration - 7 Cases)
-1. **TC_EX_01**: Đăng nhập với mật khẩu sai -> Báo lỗi xác thực, không đóng modal bất thường, giữ nguyên email.
-2. **TC_EX_02**: Đăng nhập với tài khoản chưa đăng ký (`ghost_user_xxx@dafl.vn`) -> Báo lỗi tài khoản không tồn tại.
-3. **TC_EX_03**: Bỏ trống Email khi đăng nhập -> HTML5 required validation chặn submit, không gửi request rác.
-4. **TC_EX_04**: Bỏ trống Mật khẩu khi đăng nhập -> HTML5 validation chặn submit.
-5. **TC_EX_05**: Nhập Email sai định dạng (thiếu `@` hoặc domain) -> Trình duyệt kích hoạt validation email.
-6. **TC_EX_06**: Đăng ký khi mật khẩu và mật khẩu xác nhận không khớp -> Thông báo lỗi "Mật khẩu xác nhận không khớp".
-7. **TC_EX_07**: Đăng ký với Email đã tồn tại (`demo@dafl.vn`) -> Hệ thống từ chối đăng ký trùng lặp.
-
-### Phân hệ 2: Tìm kiếm, Bộ lọc & Danh mục (Search, Filter & Catalog - 4 Cases)
-8. **TC_EX_08**: Tìm kiếm từ khóa rác vô nghĩa (`XYZ_KHONG_TON_TAI_99999`) -> Hiển thị 0 sản phẩm an toàn, không vỡ layout/trắng trang.
-9. **TC_EX_09**: Tìm kiếm chứa chuỗi SQL Injection & XSS payload (`<script>alert('xss')</script>' OR '1'='1`) -> Hệ thống lọc và xử lý an toàn (sanitization), không lỗi 500.
-10. **TC_EX_10**: Tìm kiếm toàn bộ ký tự khoảng trắng (`"     "`) -> Hệ thống xử lý an toàn không gây runtime exception.
-11. **TC_EX_11**: Bấm nút xóa tìm kiếm (X) sau khi nhận 0 kết quả -> Danh mục sản phẩm được phục hồi đầy đủ ngay lập tức.
-
-### Phân hệ 3: Giỏ hàng & Khuyến mãi Voucher (Cart & Voucher - 5 Cases)
-12. **TC_EX_12**: Mở giỏ hàng khi đang rỗng -> Hiển thị empty state "Giỏ hàng của bạn đang trống", ẩn form checkout rác.
-13. **TC_EX_13**: Áp dụng mã Voucher không tồn tại (`SAI_VOUCHER_CODE_99999`) -> Báo lỗi "Mã giảm giá không hợp lệ", tổng tiền giữ nguyên.
-14. **TC_EX_14**: Bấm áp dụng voucher khi để trống ô nhập mã -> Không kích hoạt giảm giá ảo.
-15. **TC_EX_15**: Áp dụng voucher hợp lệ rồi bấm "Bỏ chọn" -> Gỡ bỏ voucher và khôi phục tổng tiền gốc chính xác.
-16. **TC_EX_16**: Giảm số lượng sản phẩm từ 1 về 0 -> Tự động xóa sản phẩm khỏi giỏ, ngăn chặn số lượng âm (-1).
-
-### Phân hệ 4: Thanh toán & Đặt hàng (Checkout Form & PayOS - 4 Cases)
-17. **TC_EX_17**: Checkout để trống Họ và tên -> Validation chặn submit, không chuyển sang PayOS Gateway.
-18. **TC_EX_18**: Checkout với Email sai định dạng -> Email validation chặn submit.
-19. **TC_EX_19**: Checkout để trống Địa chỉ giao hàng -> Validation chặn submit đơn hàng rỗng địa chỉ.
-20. **TC_EX_20**: Checkout để trống Số điện thoại người nhận -> Validation chặn submit.
-
-### Phân hệ 5: Lịch sử đơn hàng (Orders History - 1 Case)
-21. **TC_EX_21**: Lọc đơn hàng theo trạng thái không có dữ liệu (Đã hủy) -> Hiển thị giao diện mượt mà không bị crash hay lỗi JavaScript.
-
----
-
-## ⚡ Tích hợp CI/CD Jenkinsfile có Quality Gates Tự động
-
-File `Jenkinsfile` đã được cấu hình hoàn chỉnh với 2 cổng Quality Gate:
-1. **Functional Quality Gate (Gate 1)**: Quét báo cáo Surefire XML của Selenium Headless. Nếu có bất kỳ test failure nào, pipeline sẽ **dừng ngay lập tức (ABORT)**.
-2. **Performance Quality Gate (Gate 2)**: Chạy JMeter Non-GUI load test, kiểm tra Error Rate (<= 2%) và Avg Response Time (<= 1000ms). Nếu vi phạm, pipeline sẽ **dừng ngay lập tức**.
-3. **Artifacts & Reports**: Tự động xuất Allure Visual Report và JMeter HTML Report Dashboard lên giao diện Jenkins.
-4. **Deploy Production**: Chỉ triển khai container production khi CẢ HAI Quality Gate đều đạt trạng thái PASSED!
-
----
-
-## 🚀 Hướng dẫn chạy kiểm thử
-
-### Cách 1: Chạy trực tiếp từ dòng lệnh (Maven)
-```bash
-# Chạy bộ 21 kịch bản ngoại lệ (Headless):
-mvn test -DsuiteXmlFile=testng-negative.xml -Dheadless=true
-
-# Chạy luồng E2E 8 bước (Giao diện Chrome có GUI):
-mvn test -DsuiteXmlFile=testng-flow.xml -Dheadless=false
-
-# Mở báo cáo Allure Report:
-mvn allure:serve
+```
+dafl-automation-pom/
+├── Jenkinsfile                  # Master Pipeline CI/CD (Auto Test -> Gate #1 -> PT -> Gate #2 -> Deploy Prod)
+├── Jenkinsfile.auto             # Pipeline chuyên biệt cho Automation Functional Testing (Selenium + Quality Gate #1)
+├── Jenkinsfile.pt               # Pipeline chuyên biệt cho Performance Testing (JMeter + Quality Gate #2)
+├── pom.xml                      # Cấu hình Maven, Java 17, Selenium 4.18.1, TestNG 7.9.0, Allure 2.25.0
+├── testng-flow.xml              # Suite kịch bản E2E Customer Journey (8 bước mua hàng tự nhiên)
+├── testng-negative.xml          # Suite 21 kịch bản ngoại lệ & bắt lỗi (Negative & Exception Scenarios)
+├── testng.xml                   # Suite hồi quy toàn bộ hệ thống (Regression Test Suite)
+├── src/                         # Mã nguồn Automation Functional Testing (Chuẩn Page Object Model)
+│   ├── main/java/vn/dafl/
+│   │   ├── commons/             # BasePage, BaseTest, GlobalConstants
+│   │   ├── driver/              # DriverManager (ThreadLocal thread-safe)
+│   │   ├── pageObjects/         # Nghiệp vụ thao tác từng màn hình (Auth, Catalog, Cart, Checkout, Orders)
+│   │   ├── pageUIs/             # Bộ định danh Selector (data-testid, css, xpath)
+│   │   └── reportConfig/        # AllureTestListener (Tự động capture screenshot khi fail)
+│   └── test/java/vn/dafl/tests/
+│       ├── EndToEndShoppingFlowTest.java        # Luồng mua hàng hoàn chỉnh 8 bước
+│       ├── NegativeAndExceptionScenariosTest.java # 21 kịch bản ngoại lệ không làm gãy luồng
+│       └── ...
+└── tests/performance-jmeter/    # Bộ kịch bản và công cụ kiểm thử hiệu năng
+    ├── dafl-loadtest.jmx        # Kịch bản JMeter bắn tải đồng thời Backend API
+    ├── check_performance_gate.sh# Script Shell đánh giá Quality Gate #2 (Error Rate & Response Time)
+    └── check_performance_gate.py# Phân tích thống kê kết quả kiểm thử tải
 ```
 
-### Cách 2: Chạy từ IntelliJ IDEA
-Mở thư mục `dafl_automation_pom` trong IntelliJ IDEA và chọn Run Configuration có sẵn trên thanh công cụ:
-- `Run E2E Flow (Chrome GUI)`
-- `Run E2E Flow (Headless CI)`
-- `Run Negative Scenarios (Chrome GUI)`
-- `Run Negative Scenarios (Headless CI)`
+---
+
+## 2. CHI TIẾT 2 PIPELINE: AUTO VÀ PT
+
+### A. Pipeline Auto (`Jenkinsfile.auto` - Functional Testing)
+- **Mục tiêu**: Đảm bảo toàn bộ tính năng và 21 luồng ngoại lệ hoạt động chính xác 100% trước khi triển khai.
+- **Quy trình thực thi**:
+  1. **Pull Code**: Jenkins tự động clone/pull mã nguồn mới nhất từ GitHub.
+  2. **Healthcheck SUT**: Kiểm tra container Frontend (`http://dafl-frontend:80`) sẵn sàng qua HTTP 200.
+  3. **Execute Tests**: Khởi chạy container `markhobson/maven-chrome:jdk-17` chạy TestNG suite theo tham số.
+  4. **Functional Quality Gate (#1)**: Quét file XML Surefire. Nếu phát hiện `failures > 0` hoặc `errors > 0`, **dừng ngay pipeline và đánh dấu FAILED**.
+  5. **Báo cáo**: Xuất **Allure Visual Test Report** trực quan trên giao diện Jenkins.
+
+### B. Pipeline PT (`Jenkinsfile.pt` - Performance Testing)
+- **Mục tiêu**: Đảm bảo hệ thống chịu được tải thực tế, không bị treo hoặc phản hồi chậm vượt ngưỡng cam kết SLA.
+- **Quy trình thực thi**:
+  1. **Pull Code**: Jenkins tự động kéo kịch bản JMeter `dafl-loadtest.jmx` mới nhất.
+  2. **Healthcheck Backend**: Kiểm tra Backend API phản hồi (`dafl-backend:8080/api/products`).
+  3. **Execute JMeter**: Khởi chạy container `justb4/jmeter:5.5` Non-GUI (RAM 768MB, Heap 512MB) bắn tải.
+  4. **Performance Quality Gate (#2)**: Script `check_performance_gate.sh` kiểm tra 2 chỉ số SLA:
+     - Tỉ lệ lỗi (**Error Rate**): Phải $\le 2.0\%$.
+     - Thời gian phản hồi trung bình (**Average Response Time**): Phải $\le 1000	ext{ ms}$.
+     - Nếu vi phạm bất kỳ chỉ số nào $ightarrow$ **dừng pipeline ngay lập tức**.
+  5. **Báo cáo**: Xuất **JMeter HTML Dashboard Report** biểu đồ trực quan (Throughput, Latency, Response Time percentiles).
+
+---
+
+## 3. 3 CƠ CHẾ KÍCH HOẠT (TRIGGERS) TRÊN JENKINS
+
+Cả hai pipeline (`Jenkinsfile.auto`, `Jenkinsfile.pt`) và Master `Jenkinsfile` đều được tích hợp sẵn 3 cơ chế kích hoạt tự động theo tiêu chuẩn quốc tế:
+
+```groovy
+triggers {
+    // 1. TỰ ĐỘNG CHẠY KHI CÓ CODE MỚI (Push event / GitHub Webhook)
+    githubPush()
+
+    // 2. TỰ ĐỘNG QUÉT KIỂM TRA THAY ĐỔI TRÊN GIT (Poll SCM định kỳ)
+    pollSCM('H/5 * * * *')
+
+    // 3. TỰ ĐỘNG CHẠY THEO NGÀY GIỜ CỐ ĐỊNH (Cron Schedule / Nightly Build)
+    // Pipeline Auto: Chạy lúc 02:00 sáng từ Thứ Hai đến Thứ Sáu
+    cron('0 2 * * 1-5')
+    // Pipeline PT  : Chạy lúc 03:00 sáng từ Thứ Hai đến Thứ Sáu
+    // cron('0 3 * * 1-5')
+}
+```
+
+### Cơ chế 1: Tự động chạy khi có code mới (Git Push / Webhook)
+- Bất cứ khi nào bạn hoặc developer `git push` commit mới lên branch `main`, GitHub sẽ gửi Webhook tới Jenkins hoặc Jenkins phát hiện thay đổi (`pollSCM`) để tự động kích hoạt build và test ngay.
+
+### Cơ chế 2: Tự động chạy theo ngày giờ cố định (Cron Schedule / Nightly Build)
+- Hệ thống thiết lập lịch định kỳ tự động chạy vào ban đêm mà không cần can thiệp:
+  - **Auto Test**: Tự động chạy vào lúc **02:00 sáng** hàng ngày (`0 2 * * 1-5`).
+  - **Performance Test**: Tự động chạy vào lúc **03:00 sáng** hàng ngày (`0 3 * * 1-5`).
+  - Toàn bộ báo cáo kết quả sẽ có sẵn vào buổi sáng để team kiểm tra.
+
+### Cơ chế 3: Tự nhấn nút chạy thủ công (Manual / Build with Parameters)
+- Khi bạn cần kiểm tra ngay lập tức:
+  1. Truy cập Jenkins tại: `http://localhost:8088`.
+  2. Chọn Job tương ứng (`dafl-auto-test` hoặc `dafl-performance-test`).
+  3. Bấm **"Build with Parameters"** hoặc **"Build Now"**.
+  4. Jenkins sẽ **tự động pull code mới nhất về và thực thi** theo các tham số bạn chọn (chọn Test Suite, ngưỡng Error Rate, v.v.).
+
+---
+
+## 4. HƯỚNG DẪN TẠO JOB TRÊN JENKINS UI
+
+1. Vào `http://localhost:8088` $ightarrow$ Chọn **New Item**.
+2. Nhập tên:
+   - `dafl-auto-pipeline` (cho Functional Auto Test)
+   - `dafl-pt-pipeline` (cho Performance Test)
+3. Chọn kiểu: **Pipeline** $ightarrow$ Bấm **OK**.
+4. Trong mục **Build Triggers**: Tích chọn **GitHub hook trigger for GITScm polling** và **Poll SCM**.
+5. Trong mục **Pipeline**:
+   - Definition: **Pipeline script from SCM**
+   - SCM: **Git**
+   - Repository URL: `https://github.com/xuanlepham/dafl-automation-pom.git`
+   - Branch Specifier: `*/main`
+   - Script Path:
+     - Nhập `Jenkinsfile.auto` cho Job Auto Test.
+     - Nhập `Jenkinsfile.pt` cho Job Performance Test.
+     - Nhập `Jenkinsfile` cho Master Continuous Testing Pipeline.
+6. Bấm **Save** $ightarrow$ Pipeline đã sẵn sàng hoạt động tự động 24/7!
