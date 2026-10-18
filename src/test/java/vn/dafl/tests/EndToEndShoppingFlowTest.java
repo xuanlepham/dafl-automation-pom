@@ -21,7 +21,7 @@ public class EndToEndShoppingFlowTest extends BaseTest {
     private String savedOrderCode;
 
     public EndToEndShoppingFlowTest() {
-        // Kích hoạt chế độ Single Session Flow: 1 trình duyệt duy nhất chạy liên tục từ bước 1 -> 7
+        // Kích hoạt chế độ Single Session Flow: 1 trình duyệt duy nhất chạy liên tục từ bước 1 -> 8
         this.isSingleSessionFlow = true;
     }
 
@@ -39,11 +39,11 @@ public class EndToEndShoppingFlowTest extends BaseTest {
         homePage.sleepInSecond(2);
     }
 
-    @Test(priority = 1, description = "BUOC 1: Kham pha trang chu, doi Theme Sang/Toi va Tim kiem, loc nganh hang")
-    @Story("Flow Step 1: Browse, Search and Filter")
-    @Severity(SeverityLevel.CRITICAL)
-    @Description("Xac minh trang chu hien thi, thu nghiem chuyen theme, tim kiem san pham 'LED', reset va loc danh muc")
-    public void Step01_ExploreAndSearchProducts() {
+    @Test(priority = 1, description = "BUOC 1: Kham pha trang chu, doi Theme va Dang nhap tai khoan khach hang")
+    @Story("Flow Step 1: Browse & Customer Login")
+    @Severity(SeverityLevel.BLOCKER)
+    @Description("Xac minh trang chu, thu nghiem doi Theme Sang/Toi, mo modal va dang nhap voi tai khoan demo@dafl.vn")
+    public void Step01_ExploreAndLogin() {
         // 1. Kiem tra Brand Logo
         Assert.assertTrue(homePage.isBrandLogoDisplayed(), "Logo DAFL Store khong hien thi");
         homePage.sleepInSecond(1);
@@ -54,30 +54,43 @@ public class EndToEndShoppingFlowTest extends BaseTest {
         homePage.toggleTheme();
         homePage.sleepInSecond(1);
 
-        // 3. Tim kiem san pham bang tu khoa thuc te trong DB ('LED')
+        // 3. Dang nhap tai khoan Demo (1 cham)
+        authModal = homePage.clickLoginRegisterInDropdown();
+        homePage.sleepInSecond(1);
+        authModal.clickDemoAccountButton();
+        homePage.sleepInSecond(2);
+        Assert.assertTrue(homePage.isUserLoggedIn(), "Dang nhap tai khoan khong thanh cong");
+    }
+
+    @Test(priority = 2, description = "BUOC 2: Tim kiem san pham theo tu khoa va Loc nganh hang")
+    @Story("Flow Step 2: Search and Category Filter")
+    @Severity(SeverityLevel.CRITICAL)
+    @Description("Tim kiem san pham 'LED', kiem tra ket qua, xoa tim kiem va loc theo danh muc nganh hang")
+    public void Step02_SearchAndFilterProducts() {
+        // 1. Tim kiem san pham bang tu khoa thuc te ('LED')
         homePage.enterSearchKeyword("LED");
         homePage.sleepInSecond(2);
         Assert.assertTrue(catalogPage.getDisplayedProductCount() >= 1, "Khong tim thay san pham voi tu khoa 'LED'");
 
-        // 4. Xoa tu khoa tim kiem de quay ve toan bo danh muc
+        // 2. Xoa tu khoa tim kiem de quay ve toan bo danh muc
         homePage.clearSearchKeyword();
         homePage.sleepInSecond(1);
 
-        // 5. Thu loc theo danh muc nganh hang
+        // 3. Thu loc theo danh muc nganh hang
         catalogPage.selectFirstCategory();
         homePage.sleepInSecond(2);
-        Assert.assertTrue(catalogPage.getDisplayedProductCount() >= 1);
+        Assert.assertTrue(catalogPage.getDisplayedProductCount() >= 1, "Danh muc khong co san pham");
 
-        // 6. Reset ve tat ca danh muc
+        // 4. Reset ve tat ca danh muc
         catalogPage.selectAllCategory();
         homePage.sleepInSecond(2);
     }
 
-    @Test(priority = 2, description = "BUOC 2: Mo xem chi tiet san pham, xem Danh gia va Them vao gio hang")
-    @Story("Flow Step 2: Product Detail and Add To Cart")
+    @Test(priority = 3, description = "BUOC 3: Xem chi tiet san pham, doc Danh gia va Them vao gio hang")
+    @Story("Flow Step 3: Product Detail and Add To Cart")
     @Severity(SeverityLevel.CRITICAL)
-    @Description("Mo modal chi tiet san pham dau tien, duyet tab Danh gia nguoi dung va bam Them vao gio")
-    public void Step02_ViewDetailAndAddToCart() {
+    @Description("Mo modal chi tiet san pham, doc tab Danh gia nguoi dung va them vao gio hang")
+    public void Step03_ViewDetailAndAddToCart() {
         // 1. Mo xem chi tiet san pham dau tien
         catalogPage.openFirstProductDetail();
         homePage.sleepInSecond(2);
@@ -95,32 +108,32 @@ public class EndToEndShoppingFlowTest extends BaseTest {
         catalogPage.addFirstProductToCart();
         homePage.sleepInSecond(2);
 
-        // 5. Kiem tra gio hang mo ra
+        // 5. Kiem tra gio hang tu dong mo ra
         Assert.assertTrue(cartDrawer.isCartDrawerDisplayed(), "Gio hang khong tu dong mo khi them san pham");
     }
 
-    @Test(priority = 3, description = "BUOC 3: Quan ly gio hang va Ap dung ma giam gia Voucher")
-    @Story("Flow Step 3: Cart Management and Voucher")
+    @Test(priority = 4, description = "BUOC 4: Quan ly gio hang va Ap dung ma giam gia Voucher")
+    @Story("Flow Step 4: Cart Management and Voucher")
     @Severity(SeverityLevel.CRITICAL)
     @Description("Ap dung ma Voucher DAFL10 trong gio hang va kiem tra tinh toan tong tien thanh toan")
-    public void Step03_ManageCartAndVoucher() {
+    public void Step04_ManageCartAndVoucher() {
         // 1. Ap dung ma Voucher DAFL10
         cartDrawer.applyVoucher("DAFL10");
         homePage.sleepInSecond(2);
         Assert.assertTrue(cartDrawer.isVoucherApplied(), "Voucher DAFL10 khong duoc ap dung");
 
-        // 2. Kiem tra tong tien da hien thi
+        // 2. Kiem tra tong tien da hien thi sau giam gia
         String totalText = cartDrawer.getFinalTotalText();
         Assert.assertFalse(totalText.isEmpty(), "Tong tien gio hang bi trong");
         homePage.sleepInSecond(2);
     }
 
-    @Test(priority = 4, description = "BUOC 4: Dien thong tin giao hang va Tao don hang chuyen sang Cong PayOS")
-    @Story("Flow Step 4: Checkout and PayOS Gateway")
+    @Test(priority = 5, description = "BUOC 5: Xac nhan thong tin nhan hang, Tao don va Thanh toan Cong PayOS")
+    @Story("Flow Step 5: Checkout and PayOS Gateway")
     @Severity(SeverityLevel.BLOCKER)
-    @Description("Dien form nhan hang, submit don hang PayOS, kiem tra ma don hang va gia lap thanh toan thanh cong")
-    public void Step04_CheckoutAndGeneratePayOSOrder() {
-        // 1. Dien form nhan hang
+    @Description("Kiem tra/Dien form nhan hang, submit don hang PayOS, nhan webhook thanh toan va xac nhan thanh cong")
+    public void Step05_CheckoutAndPayOSGateway() {
+        // 1. Form nhan hang da duoc he thong tu dong dien thong tin tai khoan da dang nhap
         checkoutPage.fillCheckoutForm(
                 "Nguyen Van Demo",
                 "demo@dafl.vn",
@@ -144,48 +157,40 @@ public class EndToEndShoppingFlowTest extends BaseTest {
         homePage.sleepInSecond(3);
         Assert.assertTrue(checkoutPage.isOrderPaidViewDisplayed(), "Man hinh Thanh toan thanh cong khong hien thi");
 
-        // 5. Dong gio hang de tro ve trang chu
-        if (checkoutPage.isElementDisplayed("css=[data-testid='continue-shopping-btn']")) {
-            checkoutPage.clickToElementByJS("css=[data-testid='continue-shopping-btn']");
+        // 5. Chuyen sang Trang Lich su don hang tu nut xem don sau khi thanh toan
+        if (checkoutPage.isElementDisplayed("css=[data-testid='view-orders-btn']")) {
+            checkoutPage.clickToElementByJS("css=[data-testid='view-orders-btn']");
         } else {
             cartDrawer.closeCartDrawer();
+            ordersPage = homePage.navigateToOrdersPage();
         }
         homePage.sleepInSecond(2);
     }
 
-    @Test(priority = 5, description = "BUOC 5: Dang nhap tai khoan va Kiem tra Don hang trong Lich su (#/orders)")
-    @Story("Flow Step 5: Customer Login and Orders Tracking")
+    @Test(priority = 6, description = "BUOC 6: Theo doi don hang vua thanh toan trong Lich su don (#/orders)")
+    @Story("Flow Step 6: Customer Orders Tracking")
     @Severity(SeverityLevel.CRITICAL)
-    @Description("Dang nhap tai khoan demo@dafl.vn, vao trang Quan ly don hang, loc don va quay lai trang chu")
-    public void Step05_LoginAndTrackOrders() {
-        // 1. Dang nhap voi tai khoan demo@dafl.vn
-        authModal = homePage.clickLoginRegisterInDropdown();
-        homePage.sleepInSecond(1);
-        authModal.clickDemoAccountButton();
-        homePage.sleepInSecond(2);
-        Assert.assertTrue(homePage.isUserLoggedIn(), "Chua dang nhap thanh cong");
-
-        // 2. Dieu huong sang Trang Lich su Don hang
-        ordersPage = homePage.navigateToOrdersPage();
-        homePage.sleepInSecond(2);
+    @Description("Vao trang Lich su don hang, kiem tra don hang vua thanh toan, loc trang thai don va quay lai trang chu")
+    public void Step06_TrackOrdersHistory() {
         Assert.assertTrue(ordersPage.isOrdersPageDisplayed(), "Trang Quan ly don hang khong hien thi");
+        homePage.sleepInSecond(2);
 
-        // 3. Thu nghiem loc cac trang thai don hang
+        // 1. Thu nghiem loc cac trang thai don hang
         ordersPage.filterPendingOrders();
         homePage.sleepInSecond(2);
         ordersPage.filterAllOrders();
         homePage.sleepInSecond(2);
 
-        // 4. Bam quay lai Trang chu
+        // 2. Quay ve Trang chu
         ordersPage.clickBackToHome();
         homePage.sleepInSecond(2);
     }
 
-    @Test(priority = 6, description = "BUOC 6: Cau hinh so dia chi nhan hang ca nhan (#/profile)")
-    @Story("Flow Step 6: Profile and Delivery Address Configuration")
+    @Test(priority = 7, description = "BUOC 7: Cau hinh so dia chi nhan hang ca nhan (#/profile)")
+    @Story("Flow Step 7: Profile and Delivery Address Configuration")
     @Severity(SeverityLevel.CRITICAL)
     @Description("Vao trang Cau hinh Dia chi, cap nhat dia chi giao hang mac dinh moi va luu thong tin")
-    public void Step06_UpdateProfileAddress() {
+    public void Step07_UpdateProfileAddress() {
         // 1. Dieu huong sang Trang Profile
         profilePage = homePage.navigateToProfilePage();
         homePage.sleepInSecond(2);
@@ -205,11 +210,11 @@ public class EndToEndShoppingFlowTest extends BaseTest {
         homePage.sleepInSecond(2);
     }
 
-    @Test(priority = 7, description = "BUOC 7: Dang xuat tai khoan an toan va Hoan tat toan bo chu trinh Flow")
-    @Story("Flow Step 7: Logout and Cleanup Session")
+    @Test(priority = 8, description = "BUOC 8: Dang xuat tai khoan an toan va Hoan tat toan bo chu trinh Flow")
+    @Story("Flow Step 8: Logout and Cleanup Session")
     @Severity(SeverityLevel.NORMAL)
     @Description("Thuc hien dang xuat tai khoan va xac minh giao dien tro ve trang thai khach vang lai")
-    public void Step07_LogoutAndFinish() {
+    public void Step08_LogoutAndFinish() {
         // 1. Dang xuat tai khoan
         homePage.clickLogoutInDropdown();
         homePage.sleepInSecond(2);
