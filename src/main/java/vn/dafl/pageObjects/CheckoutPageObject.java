@@ -36,7 +36,6 @@ public class CheckoutPageObject extends BasePage {
 
     @Step("Kiểm tra Màn hình Cổng thanh toán PayOS hiển thị")
     public boolean isPaymentViewDisplayed() {
-        waitForElementVisible(CheckoutPageUI.CHECKOUT_PAYMENT_VIEW);
         return isElementDisplayed(CheckoutPageUI.CHECKOUT_PAYMENT_VIEW);
     }
 

@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run Negative Scenarios (Headless CI)" type="TestNG">
+    <module name="dafl-automation-pom" />
+    <option name="SUITE_NAME" value="$PROJECT_DIR$/testng-negative.xml" />
+    <option name="TEST_OBJECT" value="SUITE" />
+    <properties>
+      <property name="headless" value="true" />
+    </properties>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

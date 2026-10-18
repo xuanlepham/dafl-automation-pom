@@ -22,6 +22,7 @@
         <allure.version>2.29.0</allure.version>
         <allure.maven.version>2.12.0</allure.maven.version>
         <aspectj.version>1.9.20.1</aspectj.version>
+        <suiteXmlFile>testng.xml</suiteXmlFile>
     </properties>
 
     <dependencies>
@@ -68,7 +69,7 @@
                 <version>3.2.5</version>
                 <configuration>
                     <suiteXmlFiles>
-                        <suiteXmlFile>testng.xml</suiteXmlFile>
+                        <suiteXmlFile>${suiteXmlFile}</suiteXmlFile>
                     </suiteXmlFiles>
                     <testFailureIgnore>true</testFailureIgnore>
                     <systemPropertyVariables>

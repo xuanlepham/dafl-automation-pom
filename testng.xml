@@ -7,7 +7,19 @@
         <listener class-name="vn.dafl.reportConfig.AllureTestListener"/>
     </listeners>
 
-    <test name="Regression Test - DAFL E-Commerce Platform">
+    <test name="E2E Customer Journey Flow">
+        <classes>
+            <class name="vn.dafl.tests.EndToEndShoppingFlowTest"/>
+        </classes>
+    </test>
+
+    <test name="Negative &amp; Exception Scenarios (21 Cases)">
+        <classes>
+            <class name="vn.dafl.tests.NegativeAndExceptionScenariosTest"/>
+        </classes>
+    </test>
+
+    <test name="Regression Test - DAFL E-Commerce Platform Modules">
         <classes>
             <class name="vn.dafl.tests.AuthTest"/>
             <class name="vn.dafl.tests.CatalogAndSearchTest"/>

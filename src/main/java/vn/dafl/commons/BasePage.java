@@ -191,4 +191,14 @@ public class BasePage {
             Thread.currentThread().interrupt();
         }
     }
+
+    public boolean isInputValid(String locator) {
+        WebElement element = getWebElement(locator);
+        return (Boolean) ((JavascriptExecutor) getDriver()).executeScript("return arguments[0].checkValidity();", element);
+    }
+
+    public String getValidationMessage(String locator) {
+        WebElement element = getWebElement(locator);
+        return (String) ((JavascriptExecutor) getDriver()).executeScript("return arguments[0].validationMessage;", element);
+    }
 }
