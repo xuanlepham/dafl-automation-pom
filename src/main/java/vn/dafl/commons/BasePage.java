@@ -91,6 +91,7 @@ public class BasePage {
     public void sendKeyToElement(String locator, String textValue) {
         waitForElementVisible(locator);
         WebElement element = getWebElement(locator);
+        element.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a", org.openqa.selenium.Keys.DELETE));
         element.clear();
         element.sendKeys(textValue);
     }

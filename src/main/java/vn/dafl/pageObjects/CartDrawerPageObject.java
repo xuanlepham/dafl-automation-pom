@@ -57,6 +57,11 @@ public class CartDrawerPageObject extends BasePage {
         return isElementDisplayed(CartDrawerPageUI.APPLIED_VOUCHER_BANNER);
     }
 
+    @Step("Kiểm tra thông báo lỗi Voucher có hiển thị không")
+    public boolean isVoucherErrorDisplayed() {
+        return isElementDisplayedWithWait(CartDrawerPageUI.VOUCHER_ERROR_MSG, 3);
+    }
+
     @Step("Lấy thông báo lỗi khi áp dụng Voucher không hợp lệ")
     public String getVoucherErrorMessage() {
         waitForElementVisible(CartDrawerPageUI.VOUCHER_ERROR_MSG);

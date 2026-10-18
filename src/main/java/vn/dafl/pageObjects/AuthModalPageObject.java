@@ -64,6 +64,11 @@ public class AuthModalPageObject extends BasePage {
         clickToElement(AuthModalPageUI.REGISTER_SUBMIT_BTN);
     }
 
+    @Step("Kiểm tra thông báo lỗi Authentication có hiển thị không")
+    public boolean isErrorMessageDisplayed() {
+        return isElementDisplayedWithWait(AuthModalPageUI.AUTH_ERROR_MSG, 3);
+    }
+
     @Step("Lấy thông báo lỗi Authentication")
     public String getErrorMessage() {
         waitForElementVisible(AuthModalPageUI.AUTH_ERROR_MSG);
