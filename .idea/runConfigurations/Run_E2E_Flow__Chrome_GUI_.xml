@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run E2E Flow (Chrome GUI)" type="TestNG">
+    <module name="dafl-automation-pom" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="vn.dafl.tests.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <option name="PACKAGE_NAME" value="vn.dafl.tests" />
+    <option name="MAIN_CLASS_NAME" value="vn.dafl.tests.EndToEndShoppingFlowTest" />
+    <option name="TEST_OBJECT" value="CLASS" />
+    <option name="VM_PARAMETERS" value="-Dheadless=false -Dapp.url=http://localhost:3000" />
+    <properties />
+    <listeners />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
