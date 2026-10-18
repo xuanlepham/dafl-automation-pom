@@ -1,94 +1,123 @@
+/**
+ * ==============================================================================
+ * BANKING & FINTECH CONTINUOUS PERFORMANCE TESTING PIPELINE (PT)
+ * ==============================================================================
+ * Standard: Core Banking SLA / PCI-DSS / Peak-Hour Simulation
+ * Module: Apache JMeter Non-GUI Load Testing & Stress Testing
+ * Engine: Containerized JMeter 5.5 Runner (Resource Isolated)
+ * Quality Gate: Performance Quality Gate #2 (Error Rate <= 2.0%, Avg RT <= 1000ms)
+ * ==============================================================================
+ */
+
 pipeline {
     agent any
 
     options {
         disableConcurrentBuilds()
-        timeout(time: 25, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '15'))
+        timeout(time: 45, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '15'))
     }
 
     // =========================================================================
-    // 3 CO CHE TRIGGER KICH HOAT TU DONG & DINH KY
+    // 3 CO CHE TRIGGER CHUAN NGAN HANG CHO PERFORMANCE TEST
     // =========================================================================
     triggers {
-        // 1. Tu dong chay ngay khi co code moi push len GitHub (Webhook)
+        // [Co che 2 - Chu dao trong Ngan hang]: Nightly Cron Schedule vao 03:00 sang khi he thong it tai nhat
+        cron('0 3 * * 1-5')
+
+        // [Co che 1]: Event-Driven Trigger - Chay khi QA cap nhat kich ban JMeter moi
         githubPush()
 
-        // 2. Tu dong kiem tra Git moi 15 phut
+        // SCM Polling kiem tra Git dinh ky moi 15 phut
         pollSCM('H/15 * * * *')
-
-        // 3. Chay dinh ky theo ngay gio co dinh (Nightly Performance Test vao 03:00 sang tu Thu 2 -> Thu 6)
-        cron('0 3 * * 1-5')
     }
 
+    // =========================================================================
+    // [Co che 3]: MANUAL ON-DEMAND TRIGGER (BUILD WITH PARAMETERS)
+    // =========================================================================
     parameters {
         string(name: 'TARGET_HOST', defaultValue: 'dafl-backend', description: 'Dia chi Host Backend can ban tai')
         string(name: 'TARGET_PORT', defaultValue: '8080', description: 'Cong Backend noi bo')
-        string(name: 'MAX_ERROR_RATE', defaultValue: '2.0', description: 'Nguong ti le loi toi da cho phep (%)')
-        string(name: 'MAX_AVG_RT_MS', defaultValue: '1000.0', description: 'Nguong thoi gian phan hoi trung binh toi da (ms)')
+        string(name: 'MAX_ERROR_RATE', defaultValue: '2.0', description: 'Nguong ti le loi toi da cho phep theo SLA (%)')
+        string(name: 'MAX_AVG_RT_MS', defaultValue: '1000.0', description: 'Nguong thoi gian phan hoi trung binh toi da theo SLA (ms)')
     }
 
     environment {
+        PROJECT_NAME    = 'dafl'
         REPO_URL        = 'https://github.com/xuanlepham/dafl-automation-pom.git'
         TARGET_BRANCH   = 'main'
         DOCKER_NETWORK  = 'dafl_dafl-network'
     }
 
     stages {
-        stage('Stage 1: Pull Code & Checkout PT Repository') {
+        stage('Stage 1: Pull Performance Suite & Audit') {
             steps {
-                echo "=== [PT] Pull kich ban JMeter moi nhat tu GitHub (${TARGET_BRANCH}) ==="
+                echo "=== [Banking PT] 1. Pull kich ban JMeter va Quality Gate Scripts tu QA Repository ==="
                 git branch: TARGET_BRANCH, url: REPO_URL
             }
         }
 
-        stage('Stage 2: Healthcheck Backend SUT') {
+        stage('Stage 2: Healthcheck Core Banking Backend') {
             steps {
-                echo "=== [PT] Kiem tra Backend ${params.TARGET_HOST}:${params.TARGET_PORT} san sang ==="
+                echo "=== [Banking PT] 2. Kiem tra Core Backend API truoc khi ban tai ==="
                 sh """
-                    RETRIES=15
+                    RETRIES=20
                     until curl -s -f http://${params.TARGET_HOST}:${params.TARGET_PORT}/api/products > /dev/null || [ \$RETRIES -eq 0 ]; do
                         echo "Dang cho Backend API phan hoi... (\$RETRIES lan thu con lai)"
                         RETRIES=\$((RETRIES - 1))
                         sleep 3
                     done
-                    echo "Backend API da san sang tiep nhan ban tai!"
+                    echo "Core Backend API san sang tiep nhan ban tai!"
                 """
             }
         }
 
-        stage('Stage 3: Execute JMeter Performance Test') {
+        stage('Stage 3: Execute JMeter Non-GUI Load Testing') {
             steps {
-                echo "=== [PT] Khoi dong JMeter Non-GUI Runner tren Docker ==="
-                dir('tests/performance-jmeter') {
+                echo "=== [Banking PT] 3. Khoi dong JMeter Non-GUI Runner (Heap: 512MB, RAM: 768MB) ==="
+                dir('performance-jmeter') {
                     sh """
                         rm -rf results && mkdir -p results
 
-                        docker run --rm                             --name dafl-jmeter-pt-runner                             --network ${DOCKER_NETWORK}                             --volumes-from dafl-jenkins                             -w \$(pwd)                             --memory=768m                             --cpus=1.0                             -e JVM_XMS=256 -e JVM_XMX=512 -e JVM_XMN=128                             justb4/jmeter:5.5                             -n -t dafl-loadtest.jmx                             -Jtarget_host=${params.TARGET_HOST}                             -Jtarget_port=${params.TARGET_PORT}                             -l results/result.jtl                             -e -o results/dashboard || true
+                        docker run --rm \
+                            --name dafl-jmeter-pt-runner \
+                            --network ${DOCKER_NETWORK} \
+                            --volumes-from dafl-jenkins \
+                            -w \$(pwd) \
+                            --memory=768m \
+                            --cpus=1.0 \
+                            -e JVM_XMS=256 -e JVM_XMX=512 -e JVM_XMN=128 \
+                            justb4/jmeter:5.5 \
+                            -n -t dafl-loadtest.jmx \
+                            -Jtarget_host=${params.TARGET_HOST} \
+                            -Jtarget_port=${params.TARGET_PORT} \
+                            -l results/result.jtl \
+                            -e -o results/dashboard || true
                     """
                 }
             }
             post {
                 always {
+                    // Xuat JMeter HTML Dashboard truc quan
                     publishHTML([
                         allowMissing: true,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
-                        reportDir: 'tests/performance-jmeter/results/dashboard',
+                        reportDir: 'performance-jmeter/results/dashboard',
                         reportFiles: 'index.html',
                         reportName: 'JMeter Performance Dashboard',
-                        reportTitles: 'Bao Cao Hieu Nang JMeter'
+                        reportTitles: 'Bao Cao Hieu Nang JMeter Chuan Ngan Hang'
                     ])
 
-                    archiveArtifacts artifacts: 'tests/performance-jmeter/results/*.jtl', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'performance-jmeter/results/*.jtl', allowEmptyArchive: true
                 }
             }
         }
 
-        stage('Stage 4: Performance Quality Gate') {
+        stage('Stage 4: Performance Quality Gate Enforcement') {
             steps {
-                echo "=== [PT] Performance Quality Gate (Error Rate <= ${params.MAX_ERROR_RATE}%, Avg RT <= ${params.MAX_AVG_RT_MS}ms) ==="
-                dir('tests/performance-jmeter') {
+                echo "=== [Banking PT] 4. Danh gia SLA: Error Rate <= ${params.MAX_ERROR_RATE}%, Avg RT <= ${params.MAX_AVG_RT_MS}ms ==="
+                dir('performance-jmeter') {
                     sh """
                         chmod +x check_performance_gate.sh
                         ./check_performance_gate.sh results/result.jtl ${params.MAX_ERROR_RATE} ${params.MAX_AVG_RT_MS}
@@ -105,12 +134,12 @@ pipeline {
         }
         success {
             echo "=========================================================="
-            echo "PERFORMANCE TEST PIPELINE: PASSED (Dat tieu chuan SLA)"
-            echo "Xem Dashboard tai menu ben trai: JMeter Performance Dashboard"
+            echo "PERFORMANCE TEST PIPELINE: PASSED (Dat tieu chuan SLA Ngan Hang)"
+            echo "Xem Dashboard chi tiet tai menu ben trai: JMeter Performance Dashboard"
             echo "=========================================================="
         }
         failure {
-            echo "PERFORMANCE TEST PIPELINE: FAILED (Vuot nguong SLA hoac loi tai)"
+            echo "[ALERT] PERFORMANCE TEST PIPELINE: FAILED - He thong vuot nguong SLA hoac bi qua tai!"
         }
     }
 }

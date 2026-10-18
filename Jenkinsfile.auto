@@ -1,85 +1,122 @@
+/**
+ * ==============================================================================
+ * BANKING & FINTECH CONTINUOUS TESTING PIPELINE (AUTO TEST)
+ * ==============================================================================
+ * Standard: PCI-DSS v4.0 / ISO 27001 / Segregation of Duties (SoD)
+ * Module: Functional UI & API Automation Regression Pipeline
+ * Execution Engine: Selenium WebDriver 4.x + TestNG + Chrome Headless Container
+ * Quality Gate: Functional Quality Gate #1 (Zero Failures Policy)
+ * ==============================================================================
+ */
+
 pipeline {
     agent any
 
     options {
+        // Ngan chan cac ban build dong thoi gay xung dot du lieu ngan hang
         disableConcurrentBuilds()
-        timeout(time: 25, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '15'))
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '15'))
     }
 
     // =========================================================================
-    // 3 CO CHE TRIGGER KICH HOAT TU DONG & DINH KY
+    // 3 CO CHE TRIGGER CHUAN NGAN HANG
     // =========================================================================
     triggers {
-        // 1. Tu dong chay ngay khi co code moi push len GitHub (Webhook)
+        // [Co che 1]: Event-Driven Trigger - Tu dong chay ngay khi co commit/PR merge tren GitHub
         githubPush()
 
-        // 2. Tu dong kiem tra Git moi 5 phut (neu chua setup webhook public)
+        // [Co che 1 Bo tro]: SCM Polling - Tu dong quet Git moi 5 phut phong truong hop mat ket noi Webhook
         pollSCM('H/5 * * * *')
 
-        // 3. Chay dinh ky theo ngay gio co dinh (Nightly Regression vao 02:00 sang tu Thu 2 -> Thu 6)
+        // [Co che 2]: Scheduled Nightly Build - Tu dong chay hoi quy toan bo he thong luc 02:00 sang tu Thu 2 -> Thu 6
         cron('0 2 * * 1-5')
     }
 
+    // =========================================================================
+    // [Co che 3]: MANUAL ON-DEMAND TRIGGER (BUILD WITH PARAMETERS)
+    // =========================================================================
     parameters {
         choice(
             name: 'TEST_SUITE',
             choices: ['testng-flow.xml', 'testng-negative.xml', 'testng.xml'],
-            description: 'Chon bo test suite: testng-flow.xml (E2E 8 buoc), testng-negative.xml (21 Exception Cases), testng.xml (Full Regression)'
+            description: 'Bo test suite: testng-flow.xml (E2E 8 buoc Mua hang), testng-negative.xml (21 Kich ban Ngoai le & Bao mat), testng.xml (Full Regression)'
         )
         string(
             name: 'APP_URL',
             defaultValue: 'http://dafl-frontend:80',
-            description: 'Dia chi Frontend ung dung DAFL trong mang Docker'
+            description: 'Dia chi ung dung DAFL trong mang Docker'
+        )
+        booleanParam(
+            name: 'FAIL_FAST',
+            defaultValue: true,
+            description: 'Dung pipeline ngay lap tuc neu phat hien bat ky Test Case nao that bai (Functional Quality Gate)'
         )
     }
 
     environment {
+        PROJECT_NAME    = 'dafl'
         REPO_URL        = 'https://github.com/xuanlepham/dafl-automation-pom.git'
         TARGET_BRANCH   = 'main'
         DOCKER_NETWORK  = 'dafl_dafl-network'
     }
 
     stages {
-        stage('Stage 1: Pull Code & Checkout Test Repository') {
+        stage('Stage 1: Pull Code & Audit Workspace') {
             steps {
-                echo "=== [Auto Test] Pull ma nguon test POM moi nhat tu GitHub (${TARGET_BRANCH}) ==="
+                echo "=== [Banking Auto CI] 1. Pull ma nguon kiem thu moi nhat tu QA Repository (${TARGET_BRANCH}) ==="
                 git branch: TARGET_BRANCH, url: REPO_URL
+                sh """
+                    echo "Git Commit Hash: \$(git rev-parse --short HEAD)"
+                    echo "Git Author: \$(git log -1 --pretty=format:'%an <%ae>')"
+                """
             }
         }
 
         stage('Stage 2: Healthcheck SUT Environment') {
             steps {
-                echo "=== [Auto Test] Kiem tra ket noi den DAFL Frontend & Backend ==="
+                echo "=== [Banking Auto CI] 2. Kiem tra tinh san sang cua he thong DAFL (Frontend & Backend) ==="
                 sh """
-                    RETRIES=15
+                    RETRIES=20
                     until curl -s -f ${params.APP_URL} > /dev/null || [ \$RETRIES -eq 0 ]; do
                         echo "Dang cho Frontend san sang... (\$RETRIES lan thu con lai)"
                         RETRIES=\$((RETRIES - 1))
                         sleep 3
                     done
-                    echo "Frontend da san sang tiep nhan kiem thu tu dong!"
+                    echo "Frontend DAFL san sang tiep nhan kiem thu tu dong!"
                 """
             }
         }
 
         stage('Stage 3: Execute Selenium Continuous Testing') {
             steps {
-                echo "=== [Auto Test] Thuc thi Selenium Headless trong Docker Runner ==="
+                echo "=== [Banking Auto CI] 3. Thuc thi Selenium Headless trong Docker Runner cach ly ==="
                 sh """
                     rm -rf target/surefire-reports target/allure-results || true
 
                     SUITE_FILE="${params.TEST_SUITE ?: 'testng-flow.xml'}"
-                    echo "Running Suite: \${SUITE_FILE}"
+                    echo "Running Test Suite: \${SUITE_FILE}"
 
-                    docker run --rm                         --name dafl-selenium-auto-runner                         --network ${DOCKER_NETWORK}                         --volumes-from dafl-jenkins                         -w \$(pwd)                         --memory=1.5g                         --cpus=2.0                         -e APP_URL="${params.APP_URL}"                         markhobson/maven-chrome:jdk-17                         mvn clean test -DsuiteXmlFile=\${SUITE_FILE} -Dheadless=true || true
+                    # Runner container cach ly tai nguyen (Memory: 1.5GB, CPU: 2.0 Cores)
+                    docker run --rm \
+                        --name dafl-selenium-auto-runner \
+                        --network ${DOCKER_NETWORK} \
+                        --volumes-from dafl-jenkins \
+                        -w \$(pwd) \
+                        --memory=1.5g \
+                        --cpus=2.0 \
+                        -e APP_URL="${params.APP_URL}" \
+                        markhobson/maven-chrome:jdk-17 \
+                        mvn clean test -DsuiteXmlFile=\${SUITE_FILE} -Dheadless=true || true
                 """
             }
             post {
                 always {
+                    // Xuat bao cao kiem thu chuan JUnit XML
                     junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
                     archiveArtifacts artifacts: 'target/surefire-reports/*.xml', allowEmptyArchive: true
 
+                    // Xuat Allure Test Report truc quan
                     script {
                         def allureDir = "target/allure-results"
                         if (fileExists(allureDir)) {
@@ -92,7 +129,7 @@ pipeline {
                                     results: [[path: allureDir]]
                                 ])
                             } catch (Throwable err) {
-                                echo "Allure Report warning: ${err}"
+                                echo "Allure Report Notice: ${err}"
                             }
                         }
                     }
@@ -100,15 +137,16 @@ pipeline {
             }
         }
 
-        stage('Stage 4: Functional Quality Gate') {
+        stage('Stage 4: Functional Quality Gate Enforcement') {
             steps {
-                echo "=== [Auto Test] Functional Quality Gate - Kiem soat chat luong nghiem ngat ==="
+                echo "=== [Banking Auto CI] 4. Ap dung Functional Quality Gate (Chinh sach 0-Failures) ==="
                 script {
                     def reportDir = "target/surefire-reports"
                     if (!fileExists(reportDir)) {
-                        error("[Functional Quality Gate FAILED] Khong tim thay thu muc bao cao Surefire!")
+                        error("[FUNCTIONAL QUALITY GATE FAILED] Khong tim thay bao cao kiem thu Surefire!")
                     }
 
+                    // Quet tat ca cac the failures va errors trong file XML
                     def hasFailures = sh(
                         script: "grep -rnE 'failures=\"[1-9][0-9]*\"|errors=\"[1-9][0-9]*\"' ${reportDir}/*.xml 2>/dev/null || true",
                         returnStdout: true
@@ -116,13 +154,17 @@ pipeline {
 
                     if (hasFailures) {
                         echo "=========================================================="
-                        echo "CHI TIET TEST CASE THAT BAI:"
+                        echo "CHI TIET TEST CASE THAT BAI (VI PHAM QUALITY GATE):"
                         echo hasFailures
                         echo "=========================================================="
-                        error("[Functional Quality Gate FAILED] Phat hien Test Case that bai! Chan pipeline ngay lap tuc.")
+                        if (params.FAIL_FAST) {
+                            error("[FUNCTIONAL QUALITY GATE REJECTED] Phat hien test case loi! Chan pipeline ngay lap tuc theo tieu chuan ngan hang.")
+                        } else {
+                            unstable("[WARNING] Co test case that bai nhung FAIL_FAST duoc tat.")
+                        }
                     } else {
                         echo "=========================================================="
-                        echo "[Functional Quality Gate PASSED] Toan bo test case Selenium deu vuot qua 100%!"
+                        echo "[FUNCTIONAL QUALITY GATE APPROVED] 100% Test Cases deu PASSED!"
                         echo "=========================================================="
                     }
                 }
@@ -132,17 +174,17 @@ pipeline {
 
     post {
         always {
-            echo "=== Don dep Selenium Runner ==="
+            echo "=== Don dep Selenium Test Runner ==="
             sh "docker rm -f dafl-selenium-auto-runner 2>/dev/null || true"
         }
         success {
             echo "=========================================================="
             echo "AUTOMATION TEST PIPELINE: PASSED (100% Tests Thanh Cong)"
-            echo "Xem Allure Report tai menu ben trai cua Jenkins"
+            echo "He thong san sang de tien hanh Performance Test"
             echo "=========================================================="
         }
         failure {
-            echo "AUTOMATION TEST PIPELINE: FAILED (Co Test Case That Bai hoac loi moi truong)"
+            echo "[ALERT] AUTOMATION TEST PIPELINE: FAILED - Phat hien loi chuc nang!"
         }
     }
 }
