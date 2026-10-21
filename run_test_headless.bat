@@ -8,9 +8,26 @@ echo ========================================================
 rem Tu nhan dien thu muc chua file .bat nay - clone o dau cung chay duoc
 cd /d "%~dp0"
 
-rem ===== Buoc 0: Kiem tra Java (JDK) - thieu thi TU CAI bang winget =====
+rem ===== Buoc 0: Chuan hoa JAVA_HOME (Maven bat buoc can bien nay tro dung JDK) =====
+if exist "%JAVA_HOME%\bin\java.exe" goto JAVA_OK
+rem Uu tien thu muc Temurin JDK 17 mac dinh (bo cai DAFL / winget cai vao day)
+for /d %%D in ("C:\Program Files\Eclipse Adoptium\jdk-17*") do set "JAVA_HOME=%%D"
+if exist "%JAVA_HOME%\bin\java.exe" goto JAVA_OK
+rem Java co trong PATH nhung JAVA_HOME thieu/sai -> suy ra tu vi tri java.exe
 java -version >nul 2>nul
-if not errorlevel 1 goto JAVA_OK
+if errorlevel 1 goto INSTALL_JAVA
+for /f "delims=" %%J in ('where java') do (
+    set "JAVA_HOME=%%~dpJ"
+    goto DERIVED_HOME
+)
+:DERIVED_HOME
+set "JAVA_HOME=%JAVA_HOME:~0,-5%"
+if exist "%JAVA_HOME%\bin\java.exe" goto JAVA_OK
+echo [LOI] Khong xac dinh duoc JAVA_HOME hop le. Gia tri hien tai: "%JAVA_HOME%"
+echo Hay cai lai Temurin JDK 17 hoac dat JAVA_HOME tro vao thu muc JDK (khong phai JRE, khong kem \bin).
+pause
+exit /b 1
+:INSTALL_JAVA
 echo [JAVA] Chua tim thay Java - dang tu cai Eclipse Temurin JDK 17 qua winget...
 echo [JAVA] Buoc nay can Internet; neu Windows hoi quyen Admin hay bam Yes.
 where winget >nul 2>nul
@@ -20,17 +37,15 @@ if errorlevel 1 (
     exit /b 1
 )
 winget install --id EclipseAdoptium.Temurin.17.JDK -e --silent --accept-package-agreements --accept-source-agreements
-rem Nap lai JAVA_HOME va PATH ngay trong phien nay, khong can mo lai cua so
 for /d %%D in ("C:\Program Files\Eclipse Adoptium\jdk-17*") do set "JAVA_HOME=%%D"
-if defined JAVA_HOME set "PATH=%JAVA_HOME%\bin;%PATH%"
-java -version >nul 2>nul
-if errorlevel 1 (
-    echo [LOI] Da cai Java nhung phien nay chua nhan dien duoc. Hay DONG cua so nay, mo lai roi chay lai file .bat.
-    pause
-    exit /b 1
-)
+if exist "%JAVA_HOME%\bin\java.exe" goto JAVA_OK
+echo [LOI] Da cai Java nhung chua dat duoc JAVA_HOME. Hay DONG cua so nay, mo lai roi chay lai file .bat.
+pause
+exit /b 1
 :JAVA_OK
-echo [JAVA] San sang.
+set "PATH=%JAVA_HOME%\bin;%PATH%"
+echo [JAVA] JAVA_HOME = %JAVA_HOME%
+java -version
 
 rem ===== Chay test: uu tien Maven Wrapper di kem repo =====
 if exist "%~dp0mvnw.cmd" goto USE_WRAPPER
