@@ -8,11 +8,17 @@ echo   Target SUT: http://localhost:3000
 echo ========================================================
 rem Tu nhan dien thu muc chua file .bat nay - clone o dau cung chay duoc
 cd /d "%~dp0"
+rem Uu tien Maven Wrapper (mvnw.cmd) di kem repo - may chi can JDK, khong can cai Maven
+if exist "%~dp0mvnw.cmd" goto USE_WRAPPER
 where mvn >nul 2>nul
 if errorlevel 1 (
-    echo [LOI] Khong tim thay Maven trong PATH. Hay cai Maven 3.9+ hoac them thu muc bin cua Maven vao PATH roi chay lai.
+    echo [LOI] Khong tim thay Maven trong PATH va repo khong co Maven Wrapper.
     pause
     exit /b 1
 )
-mvn test -Dtest=EndToEndShoppingFlowTest -Dheadless=false "-Dapp.url=http://localhost:3000" %*
+call mvn test -Dtest=EndToEndShoppingFlowTest -Dheadless=false "-Dapp.url=http://localhost:3000" %*
+goto END
+:USE_WRAPPER
+call "%~dp0mvnw.cmd" test -Dtest=EndToEndShoppingFlowTest -Dheadless=false "-Dapp.url=http://localhost:3000" %*
+:END
 pause
